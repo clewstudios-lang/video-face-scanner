@@ -1,0 +1,18 @@
+# Virtual environment
+venv/
+
+# Database (personal data — don't commit)
+faces.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
