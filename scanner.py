@@ -68,19 +68,20 @@ def scan_video(video_path: str, frame_interval: int = 10, progress_callback=None
     cap.release()
 
 
-def match_face(encoding: np.ndarray, known: list, tolerance: float = 0.55):
+def match_face(encoding: np.ndarray, known: list):
     """
     known: list of (person_id, name, encoding)
-    Returns (person_id, name) of best match, or (None, None).
+    Returns (person_id, name, confidence_pct) of best match.
+    confidence_pct is 0–100; higher = more confident.
+    Returns (None, None, 0.0) if database is empty.
     """
     if not known:
-        return None, None
+        return None, None, 0.0
     known_encs = [k[2] for k in known]
     distances = face_recognition.face_distance(known_encs, encoding)
     best = int(np.argmin(distances))
-    if distances[best] <= tolerance:
-        return known[best][0], known[best][1]
-    return None, None
+    confidence = round(max(0.0, (1.0 - distances[best]) * 100), 1)
+    return known[best][0], known[best][1], confidence
 
 
 def is_new_unknown(encoding: np.ndarray, seen_encodings: list, threshold: float = 0.50) -> bool:

@@ -9,6 +9,8 @@ from PIL import Image, ImageTk
 import database as db
 import scanner as sc
 
+_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
+
 
 def fmt_time(seconds: float) -> str:
     m = int(seconds // 60)
@@ -22,6 +24,7 @@ class VideoFaceScanner(tk.Tk):
         self.title("Video Face Scanner")
         self.geometry("960x620")
         self.minsize(760, 520)
+        self._set_icon()
         db.init_db()
         self._known: list = []          # [(person_id, name, encoding), ...]
         self._face_queue: list = []     # pending unknown face dicts
@@ -29,6 +32,14 @@ class VideoFaceScanner(tk.Tk):
         self._scan_running = False
         self._load_known()
         self._build_ui()
+
+    def _set_icon(self):
+        try:
+            img = Image.open(_ICON_PATH)
+            self._icon_photo = ImageTk.PhotoImage(img)
+            self.iconphoto(True, self._icon_photo)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Data helpers
@@ -175,7 +186,7 @@ class VideoFaceScanner(tk.Tk):
         path = filedialog.askopenfilename(
             title="Select Video File",
             filetypes=[
-                ("Video files", "*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.m4v *.webm"),
+                ("Video files", "*.mp4 *.MP4 *.avi *.AVI *.mov *.MOV *.mkv *.MKV *.wmv *.WMV *.flv *.FLV *.m4v *.M4V *.webm *.WEBM"),
                 ("All files", "*.*"),
             ],
         )
@@ -211,9 +222,9 @@ class VideoFaceScanner(tk.Tk):
                     break
 
                 face_data["video_path"] = video_path
-                person_id, name = sc.match_face(face_data["encoding"], self._known)
+                person_id, name, confidence = sc.match_face(face_data["encoding"], self._known)
 
-                if person_id is not None:
+                if person_id is not None and confidence > 50.0:
                     db.add_appearance(
                         person_id, video_path,
                         face_data["frame_number"], face_data["timestamp_sec"],
@@ -222,6 +233,8 @@ class VideoFaceScanner(tk.Tk):
                 else:
                     if sc.is_new_unknown(face_data["encoding"], self._seen_unknown_encs):
                         self._seen_unknown_encs.append(face_data["encoding"])
+                        face_data["candidate_name"] = name
+                        face_data["candidate_confidence"] = confidence
                         self.after(0, self._enqueue_unknown, face_data)
 
             self.after(0, self._on_scan_done, video_path)
@@ -298,6 +311,18 @@ class VideoFaceScanner(tk.Tk):
         ttk.Label(outer, text=f"{remaining} face(s) remaining in queue",
                   foreground="#888").pack(pady=(2, 10))
 
+        # Confidence hint
+        candidate = face.get("candidate_name")
+        conf = face.get("candidate_confidence", 0.0)
+        if candidate and conf > 0:
+            hint_color = "#b07000" if conf >= 30 else "#888888"
+            ttk.Label(
+                outer,
+                text=f"Best guess: {candidate}  ({conf:.0f}% confidence — below auto-match threshold)",
+                foreground=hint_color,
+                font=("TkDefaultFont", 9, "italic"),
+            ).pack(pady=(0, 6))
+
         # Name input
         input_frame = ttk.LabelFrame(outer, text="Who is this person?", padding=8)
         input_frame.pack(fill=tk.X, pady=4)
@@ -310,6 +335,8 @@ class VideoFaceScanner(tk.Tk):
             combo = ttk.Combobox(input_frame, textvariable=name_var,
                                   values=[p[1] for p in persons], state="readonly", width=26)
             combo.grid(row=0, column=1, padx=6, sticky=tk.W)
+            if candidate and candidate in [p[1] for p in persons]:
+                name_var.set(candidate)
 
         ttk.Label(input_frame, text="New name:").grid(row=1, column=0, sticky=tk.W, pady=(6, 0))
         entry = ttk.Entry(input_frame, width=28)
