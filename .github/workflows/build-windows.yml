@@ -30,7 +30,9 @@ jobs:
           pip install face_recognition
 
       - name: Install PyInstaller
-        run: pip install pyinstaller
+        run: |
+          pip install pyinstaller
+          pip install --upgrade --force-reinstall setuptools
 
       - name: Convert icon.png to icon.ico
         run: |
@@ -43,6 +45,9 @@ jobs:
           --icon assets/icon.ico
           --add-data "assets;assets"
           --collect-data face_recognition_models
+          --copy-metadata face_recognition_models
+          --hidden-import pkg_resources
+          --hidden-import pkg_resources.py2_warn
           main.py
 
       - name: Show build output
