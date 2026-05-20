@@ -129,6 +129,12 @@ class VideoFaceScanner(tk.Tk):
         ttk.Spinbox(top, from_=1, to=120, width=5, textvariable=self.interval_var).pack(side=tk.LEFT, padx=2)
         ttk.Label(top, text="frames").pack(side=tk.LEFT)
 
+        ttk.Label(top, text="   Workers").pack(side=tk.LEFT)
+        cpu_max = max(1, (os.cpu_count() or 2))
+        self.workers_var = tk.IntVar(value=min(3, cpu_max))
+        ttk.Spinbox(top, from_=1, to=cpu_max, width=4, textvariable=self.workers_var).pack(side=tk.LEFT, padx=2)
+        ttk.Label(top, text="(1 = single-threaded)", foreground="#888").pack(side=tk.LEFT)
+
         self.stop_btn = ttk.Button(top, text="Stop", command=self._stop_scan, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT, padx=10)
 
@@ -219,13 +225,23 @@ class VideoFaceScanner(tk.Tk):
     def _scan_thread(self, video_path):
         try:
             interval = self.interval_var.get()
+            workers = max(1, self.workers_var.get())
 
-            def progress(current, total):
-                if total > 0:
-                    pct = current / total * 100
-                    self.after(0, self._on_progress, pct, current, total)
+            if workers > 1:
+                def progress(current, total, in_flight, n_workers):
+                    pct = (current / total * 100) if total > 0 else 0.0
+                    self.after(0, self._on_progress_parallel, pct, current, total, in_flight, n_workers)
 
-            for face_data in sc.scan_video(video_path, interval, progress):
+                source = sc.scan_video_parallel(video_path, interval, workers, progress)
+            else:
+                def progress(current, total):
+                    if total > 0:
+                        pct = current / total * 100
+                        self.after(0, self._on_progress, pct, current, total)
+
+                source = sc.scan_video(video_path, interval, progress)
+
+            for face_data in source:
                 if not self._scan_running:
                     break
 
@@ -254,7 +270,15 @@ class VideoFaceScanner(tk.Tk):
     def _on_progress(self, pct, current, total):
         self.progress_var.set(pct)
         self.status_var.set(
-            f"Frame {current:,} / {total:,}   |   {len(self._face_queue)} new face(s) to review"
+            f"Single-threaded · frame {current:,} / {total:,} · "
+            f"{len(self._face_queue)} new face(s) to review"
+        )
+
+    def _on_progress_parallel(self, pct, completed, total, in_flight, n_workers):
+        self.progress_var.set(pct)
+        self.status_var.set(
+            f"{n_workers} workers in parallel · {completed:,}/{total:,} frames processed · "
+            f"{in_flight} in flight · {len(self._face_queue)} face(s) to review"
         )
 
     def _on_scan_done(self, video_path):

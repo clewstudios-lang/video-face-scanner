@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Video Face Scanner — entry point."""
 
+import multiprocessing
 import sys
 
 
@@ -21,6 +22,7 @@ def check_imports():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     check_imports()
     from gui import VideoFaceScanner
     app = VideoFaceScanner()
