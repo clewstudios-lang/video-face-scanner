@@ -26,6 +26,7 @@ jobs:
         run: |
           pip install numpy Pillow opencv-python
           pip install dlib
+          pip install git+https://github.com/ageitgey/face_recognition_models
           pip install face_recognition
 
       - name: Install PyInstaller
@@ -41,7 +42,7 @@ jobs:
           --name VideoFaceScanner
           --icon assets/icon.ico
           --add-data "assets;assets"
-          --collect-all face_recognition_models
+          --collect-data face_recognition_models
           main.py
 
       - name: Show build output
