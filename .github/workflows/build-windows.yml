@@ -39,16 +39,18 @@ jobs:
           python -c "from PIL import Image; Image.open('assets/icon.png').save('assets/icon.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
       - name: Build .exe
-        run: >
-          pyinstaller --noconfirm --clean --onefile --windowed
-          --name VideoFaceScanner
-          --icon assets/icon.ico
-          --add-data "assets;assets"
-          --collect-data face_recognition_models
-          --copy-metadata face_recognition_models
-          --hidden-import pkg_resources
-          --hidden-import pkg_resources.py2_warn
-          main.py
+        shell: pwsh
+        run: |
+          $frm = python -c "import os, face_recognition_models as f; print(os.path.dirname(f.__file__))"
+          Write-Host "face_recognition_models at: $frm"
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name VideoFaceScanner `
+            --icon assets/icon.ico `
+            --add-data "assets;assets" `
+            --add-data "${frm};face_recognition_models" `
+            --hidden-import pkg_resources `
+            --hidden-import face_recognition_models `
+            main.py
 
       - name: Show build output
         run: dir dist
