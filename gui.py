@@ -9,6 +9,7 @@ from PIL import Image, ImageTk
 
 import database as db
 import scanner as sc
+import video_player as vp
 
 
 def _resource_path(rel: str) -> str:
@@ -24,6 +25,39 @@ def fmt_time(seconds: float) -> str:
     m = int(seconds // 60)
     s = int(seconds % 60)
     return f"{m:02d}:{s:02d}"
+
+
+def make_timestamp_link(parent, video_path: str, timestamp_sec: float,
+                        status_setter=None, text: str = None,
+                        font=None):
+    """Create a clickable tk.Label that opens the video at the given second.
+
+    `status_setter` (optional): a callable(str) used to show feedback (e.g. "Opened in VLC at 75s").
+    """
+    label = tk.Label(
+        parent,
+        text=text or fmt_time(timestamp_sec),
+        fg="#1565c0",
+        cursor="hand2",
+        bg=parent.cget("background") if "background" in parent.keys() else None,
+        font=font or ("TkDefaultFont", 9, "underline"),
+    )
+
+    def on_click(_event=None):
+        result = vp.open_video_at(video_path, timestamp_sec)
+        if status_setter:
+            status_setter(result)
+
+    def on_enter(_event=None):
+        label.config(fg="#0a3d91")
+
+    def on_leave(_event=None):
+        label.config(fg="#1565c0")
+
+    label.bind("<Button-1>", on_click)
+    label.bind("<Enter>", on_enter)
+    label.bind("<Leave>", on_leave)
+    return label
 
 
 class VideoFaceScanner(tk.Tk):
@@ -173,6 +207,10 @@ class VideoFaceScanner(tk.Tk):
         self.search_combo = ttk.Combobox(top, textvariable=self.search_var, state="readonly", width=28)
         self.search_combo.pack(side=tk.LEFT, padx=6)
         ttk.Button(top, text="Find", command=self._do_search).pack(side=tk.LEFT)
+
+        self.search_status_var = tk.StringVar(value="Tip: click a timecode to jump to it (VLC/mpv recommended).")
+        ttk.Label(parent, textvariable=self.search_status_var, foreground="#666",
+                  font=("TkDefaultFont", 8)).pack(anchor=tk.W, padx=10)
 
         # Scrollable results
         container = ttk.Frame(parent)
@@ -475,8 +513,17 @@ class VideoFaceScanner(tk.Tk):
             lf.pack(fill=tk.X, padx=6, pady=4)
             ttk.Label(lf, text=video_path, foreground="#666",
                       font=("TkDefaultFont", 8), wraplength=560).pack(anchor=tk.W)
-            times = "  ".join(fmt_time(ts) for _, ts, _ in frames)
-            ttk.Label(lf, text=f"Timecodes:  {times}", wraplength=560).pack(anchor=tk.W, pady=2)
+
+            timecodes_row = tk.Frame(lf)
+            timecodes_row.pack(anchor=tk.W, pady=2, fill=tk.X)
+            ttk.Label(timecodes_row, text="Timecodes:").pack(side=tk.LEFT)
+            for _, ts, _ in frames:
+                link = make_timestamp_link(
+                    timecodes_row, video_path, ts,
+                    status_setter=lambda msg: self.search_status_var.set(msg),
+                )
+                link.pack(side=tk.LEFT, padx=4)
+
             ttk.Label(lf, text=f"{len(frames)} appearance(s)", foreground="#555").pack(anchor=tk.W)
 
 
@@ -512,6 +559,10 @@ class AppearancesWindow(tk.Toplevel):
 
         self._photos = []  # keep references
 
+        self.status_var = tk.StringVar(value="Tip: click a thumbnail or timecode to open the video at that point.")
+        ttk.Label(self, textvariable=self.status_var, foreground="#666",
+                  font=("TkDefaultFont", 8)).pack(anchor=tk.W, padx=10, pady=(0, 6))
+
         for video_path, frames in by_video.items():
             ttk.Label(inner, text=os.path.basename(video_path),
                       font=("TkDefaultFont", 9, "bold")).pack(anchor=tk.W, pady=(10, 2))
@@ -524,13 +575,27 @@ class AppearancesWindow(tk.Toplevel):
             for i, (frame_no, ts, thumb) in enumerate(frames[:30]):
                 cell = ttk.Frame(grid)
                 cell.grid(row=i // 6, column=i % 6, padx=4, pady=4)
+
+                def open_at(_ev=None, p=video_path, t=ts):
+                    self.status_var.set(vp.open_video_at(p, t))
+
                 if thumb:
                     try:
                         img = Image.open(io.BytesIO(thumb)).resize((90, 90), Image.LANCZOS)
                         photo = ImageTk.PhotoImage(img)
                         self._photos.append(photo)
-                        ttk.Label(cell, image=photo).pack()
+                        thumb_lbl = tk.Label(cell, image=photo, cursor="hand2", borderwidth=2,
+                                             relief="flat", highlightthickness=0)
+                        thumb_lbl.pack()
+                        thumb_lbl.bind("<Button-1>", open_at)
+                        thumb_lbl.bind("<Enter>", lambda _e, w=thumb_lbl: w.config(relief="raised"))
+                        thumb_lbl.bind("<Leave>", lambda _e, w=thumb_lbl: w.config(relief="flat"))
                     except Exception:
                         ttk.Label(cell, text="[img]").pack()
-                ttk.Label(cell, text=fmt_time(ts),
-                          font=("TkDefaultFont", 8)).pack()
+
+                link = make_timestamp_link(
+                    cell, video_path, ts,
+                    status_setter=lambda msg: self.status_var.set(msg),
+                    font=("TkDefaultFont", 8, "underline"),
+                )
+                link.pack()
