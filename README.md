@@ -19,6 +19,10 @@ A lightweight face recognition app for video files, built with Python. Scan your
 
 ## Installation
 
+### Windows (download — no Python needed)
+
+Grab the latest `VideoFaceScanner.exe` from the [Releases page](https://github.com/clewstudios-lang/video-face-scanner/releases) and double-click. Your face database is stored at `%LOCALAPPDATA%\VideoFaceScanner\faces.db`.
+
 ### Raspberry Pi / Linux
 
 ```bash
@@ -70,15 +74,6 @@ video_face_scanner/
 - Matching uses Euclidean distance with a 0.55 tolerance threshold
 - Frames are scaled to 50% before processing to reduce CPU load
 - Unknown faces are de-duplicated per scan so the same person isn't queued multiple times
-
-## Windows
-
-The app runs on Windows without any code changes. Install Python 3.11+, then:
-
-```bash
-pip install -r requirements.txt
-python main.py
-```
 
 ## License
 

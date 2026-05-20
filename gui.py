@@ -1,5 +1,6 @@
 import io
 import os
+import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -9,7 +10,14 @@ from PIL import Image, ImageTk
 import database as db
 import scanner as sc
 
-_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
+
+def _resource_path(rel: str) -> str:
+    """Resolve a bundled-asset path, working both in dev and inside a PyInstaller one-file build."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
+
+
+_ICON_PATH = _resource_path(os.path.join("assets", "icon.png"))
 
 
 def fmt_time(seconds: float) -> str:

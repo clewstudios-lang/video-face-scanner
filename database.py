@@ -1,11 +1,27 @@
 import sqlite3
 import json
 import os
+import sys
 from datetime import datetime
 
 import numpy as np
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "faces.db")
+
+def _user_data_dir() -> str:
+    """Per-user app data directory, cross-platform."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    d = os.path.join(base, "VideoFaceScanner")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+# Allow override via env var (useful for tests or portable mode)
+DB_PATH = os.environ.get("VFS_DB_PATH") or os.path.join(_user_data_dir(), "faces.db")
 
 
 def init_db():
